@@ -23,15 +23,6 @@ import ChangeLog from '../changelog/connector-http.md';
 
 Used to read data from Http.
 
-## Key features
-
-- [x] [batch](../../introduction/concepts/connector-v2-features.md)
-- [x] [stream](../../introduction/concepts/connector-v2-features.md)
-- [ ] [exactly-once](../../introduction/concepts/connector-v2-features.md)
-- [ ] [column projection](../../introduction/concepts/connector-v2-features.md)
-- [ ] [parallelism](../../introduction/concepts/connector-v2-features.md)
-- [ ] [support user-defined split](../../introduction/concepts/connector-v2-features.md)
-
 Supported DataSource Info
 -------------------------
 
@@ -51,18 +42,18 @@ They can be downloaded via install-plugin.sh or from the Maven central repositor
 | schema.fields                 | Config  | No       | -           | The schema fields of upstream data                                                                                                                                            |
 | json_field                    | Config  | No       | -           | This parameter helps you configure the schema,so this parameter must be used with schema.                                                                                     |
 | pageing                       | Config  | No       | -           | This parameter is used for paging queries                                                                                                                                     |
-| pageing.page_field            | String  | No       | -           | This parameter is used to specify the page field name in the request. It can be used in headers, params, or body with placeholders like ${page_field}.                        |
+| pageing.page_field            | String  | No       | page        | This parameter is used to specify the page field name in the request. It can be used in headers, params, or body with placeholders like `${page}`.                            |
 | pageing.use_placeholder_replacement | Boolean | No | false | If true, use placeholder replacement (${field}) for headers, parameters and body values, otherwise use key-based replacement.                                                 |
-| pageing.total_page_size       | Int     | No       | -           | This parameter is used to control the total number of pages                                                                                                                   |
-| pageing.batch_size            | Int     | No       | -           | The batch size returned per request is used to determine whether to continue when the total number of pages is unknown                                                        |
+| pageing.total_page_size       | Long    | No       | 0           | This parameter is used to control the total number of pages. `0` means the connector uses the returned row count and `pageing.batch_size` to decide whether to continue.       |
+| pageing.batch_size            | Int     | No       | 100         | The batch size returned per request is used to determine whether to continue when the total number of pages is unknown                                                        |
 | pageing.start_page_number     | Int     | No       | 1           | Specify the page number from which synchronization starts                                                                                                                     |
 | pageing.page_type             | String  | No       | PageNumber  | this parameter is used to specify the page type ,or PageNumber if not set, only support `PageNumber` and `Cursor`.                                  |
 | pageing.cursor_field          | String  | No       | -           | this parameter is used to specify the Cursor field name in the request parameter.                                                                                       |
 | pageing.cursor_response_field | String  | No       | -           | This parameter specifies the field in the response from which the cursor is retrieved.                                                                                        |
-| content_field                  | String  | No       | -           | This parameter can get some json data.If you only need the data in the 'book' section, configure `content_field = "$.store.book.*"`.                                          |
+| content_field                 | String  | No       | -           | This parameter can get part of a JSON response. If you only need the data in the `book` section, configure `content_field = "$.store.book.*"`.                                |
 | format                        | String  | No       | text        | The format of upstream data, supports `json` `text` `binary`, default `text`. When set to `binary`, the response body is treated as raw bytes for downloading files (PDF, images, ZIP, etc.). |
 | binary_chunk_size             | Long    | No       | 10485760    | Chunk size in bytes when `format = binary`. Large files are split into multiple rows. Default 10MB. Only effective in BATCH mode.                                             |
-| method                        | String  | No       | get         | Http request method, only supports GET, POST method.                                                                                                                          |
+| method                        | String  | No       | GET         | Http request method, only supports GET and POST.                                                                                                                              |
 | headers                       | Map     | No       | -           | Http headers.                                                                                                                                                                 |
 | params                        | Map     | No       | -           | Http params.                                                                                                                                                                  |
 | body                          | String  | No       | -           | Http body,the program will automatically add http header application/json,body is jsonbody.                                                                                   |
@@ -70,7 +61,7 @@ They can be downloaded via install-plugin.sh or from the Maven central repositor
 | retry                         | Int     | No       | -           | The max retry times if request http return to `IOException`.                                                                                                                  |
 | retry_backoff_multiplier_ms   | Int     | No       | 100         | The retry-backoff times(millis) multiplier if request http failed.                                                                                                            |
 | retry_backoff_max_ms          | Int     | No       | 10000       | The maximum retry-backoff times(millis) if request http failed                                                                                                                |
-| enable_multi_lines            | Boolean | No       | false       |                                                                                                                                                                               |
+| enable_multi_lines            | Boolean | No       | false       | Whether to split the response text by line.                                                                                                                                   |
 | connect_timeout_ms            | Int     | No       | 12000       | Connection timeout setting, default 12s.                                                                                                                                      |
 | socket_timeout_ms             | Int     | No       | 60000       | Socket timeout setting, default 60s.                                                                                                                                          |
 | common-options                |         | No       | -           | Source plugin common parameters, please refer to [Source Common Options](../common-options/source-common-options.md) for details                                                             |
@@ -440,10 +431,7 @@ Http {
 }
 ```
 
-Here is an example:
-
-- Test data can be found at this link [mockserver-config.json](../../../../seatunnel-e2e/seatunnel-connector-v2-e2e/connector-http-e2e/src/test/resources/mockserver-config.json)
-- See this link for task configuration [http_contentjson_to_assert.conf](../../../../seatunnel-e2e/seatunnel-connector-v2-e2e/connector-http-e2e/src/test/resources/http_contentjson_to_assert.conf).
+This keeps each matched `book` item as one output row, so the schema only needs the fields inside the matched objects.
 
 ### json_field
 
@@ -503,8 +491,7 @@ source {
 }
 ```
 
-- Test data can be found at this link [mockserver-config.json](../../../../seatunnel-e2e/seatunnel-connector-v2-e2e/connector-http-e2e/src/test/resources/mockserver-config.json)
-- See this link for task configuration [http_jsonpath_to_assert.conf](../../../../seatunnel-e2e/seatunnel-connector-v2-e2e/connector-http-e2e/src/test/resources/http_jsonpath_to_assert.conf).
+This maps each JSONPath result to the field with the same name in `schema.fields`.
 
 ### pageing
 The current supported pagination type are `PageNumber` and `Cursor`.

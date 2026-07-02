@@ -41,18 +41,18 @@ import ChangeLog from '../changelog/connector-http.md';
 | schema.fields                 | Config  | 否       | -           | 上游数据的 schema 字段                                                                                                                                                                |
 | json_field                    | Config  | 否       | -           | 此参数帮助您配置 schema，因此此参数必须与 schema 一起使用。                                                                                         |
 | pageing                       | Config  | 否       | -           | 此参数用于分页查询                                                                                                                                                         |
-| pageing.page_field            | String  | 否       | -           | 此参数用于指定请求中的页面字段名称。它可以在 headers、params 或 body 中使用占位符，如 ${page_field}。                             |
+| pageing.page_field            | String  | 否       | page        | 此参数用于指定请求中的分页字段名称。它可以在 headers、params 或 body 中使用占位符，例如 `${page}`。                             |
 | pageing.use_placeholder_replacement | Boolean | 否 | false | 如果为 true，则使用占位符替换（${field}）用于 headers、parameters 和 body 值，否则使用基于键的替换。                                                  |
-| pageing.total_page_size       | Int     | 否       | -           | 此参数用于控制总页数                                                                                                                       |
-| pageing.batch_size            | Int     | 否       | -           | 每个请求返回的批量大小，用于在总页数未知时确定是否继续                                                            |
+| pageing.total_page_size       | Long    | 否       | 0           | 此参数用于控制总页数。`0` 表示连接器会根据返回行数和 `pageing.batch_size` 判断是否继续请求。                         |
+| pageing.batch_size            | Int     | 否       | 100         | 每个请求返回的批量大小，用于在总页数未知时确定是否继续                                                            |
 | pageing.start_page_number     | Int     | 否       | 1           | 指定同步开始的页码                                                                                                                         |
 | pageing.page_type             | String  | 否       | PageNumber  | 此参数用于指定页面类型，如果未设置则为 PageNumber，仅支持 `PageNumber` 和 `Cursor`。                                  |
 | pageing.cursor_field          | String  | 否       | -           | 此参数用于指定请求参数中的游标字段名称。                                                                                       |
 | pageing.cursor_response_field | String  | 否       | -           | 此参数指定从中检索游标的响应字段。                                                                                            |
-| content_field                  | String  | 否       | -           | 此参数可以获取一些 json 数据。如果您只需要 'book' 部分的数据，配置 `content_field = "$.store.book.*"`。                                              |
+| content_field                 | String  | 否       | -           | 此参数可以提取 JSON 响应中的一部分数据。如果只需要 `book` 部分的数据，可以配置 `content_field = "$.store.book.*"`。                 |
 | format                        | String  | 否       | text        | 上游数据的格式，支持 `json` `text` `binary`，默认为 `text`。当设置为 `binary` 时，响应体作为原始字节处理，用于下载文件（PDF、图片、ZIP 等）。                                     |
 | binary_chunk_size             | Long    | 否       | 10485760    | 当 `format = binary` 时的分片大小（字节）。大文件会被拆分为多行。默认 10MB。仅在 BATCH 模式下生效。                                                                             |
-| method                        | String  | 否       | get         | Http 请求方法，仅支持 GET、POST 方法。                                                                                                                              |
+| method                        | String  | 否       | GET         | Http 请求方法，仅支持 GET 和 POST。                                                                                                                              |
 | headers                       | Map     | 否       | -           | Http 头信息。                                                                                                                                                                     |
 | params                        | Map     | 否       | -           | Http 参数。                                                                                                                                                                      |
 | body                          | String  | 否       | -           | Http 请求体，程序将自动添加 http header application/json，body 是 jsonbody。                                                                                       |
@@ -60,7 +60,7 @@ import ChangeLog from '../changelog/connector-http.md';
 | retry                         | Int     | 否       | -           | 如果请求 http 返回 `IOException` 的最大重试次数。                                                                                                                      |
 | retry_backoff_multiplier_ms   | Int     | 否       | 100         | 请求 http 失败时的重试退避时间（毫秒）乘数。                                                                                                                |
 | retry_backoff_max_ms          | Int     | 否       | 10000       | 请求 http 失败时的最大重试退避时间（毫秒）                                                                                                                    |
-| enable_multi_lines            | Boolean | 否       | false       |                                                                                                                                                                                   |
+| enable_multi_lines            | Boolean | 否       | false       | 是否按行拆分响应文本。                                                                                                                                                      |
 | connect_timeout_ms            | Int     | 否       | 12000       | 连接超时设置，默认 12 秒。                                                                                                                                          |
 | socket_timeout_ms             | Int     | 否       | 60000       | Socket 超时设置，默认 60 秒。                                                                                                                                              |
 | common-options                |         | 否       | -           | 源插件通用参数，请参考 [Source Common Options](../common-options/source-common-options.md) 获取详细信息                                                                 |
@@ -429,10 +429,7 @@ Http {
 }
 ```
 
-这里是一个示例：
-
-- 测试数据可以在此链接找到 [mockserver-config.json](../../../../seatunnel-e2e/seatunnel-connector-v2-e2e/connector-http-e2e/src/test/resources/mockserver-config.json)
-- 任务配置请参考此链接 [http_contentjson_to_assert.conf](../../../../seatunnel-e2e/seatunnel-connector-v2-e2e/connector-http-e2e/src/test/resources/http_contentjson_to_assert.conf)。
+这样每个匹配到的 `book` 对象都会成为一行输出，schema 只需要声明匹配对象内部的字段。
 
 ### json_field
 
@@ -492,8 +489,7 @@ source {
 }
 ```
 
-- 测试数据可以在此链接找到 [mockserver-config.json](../../../../seatunnel-e2e/seatunnel-connector-v2-e2e/connector-http-e2e/src/test/resources/mockserver-config.json)
-- 任务配置请参考此链接 [http_jsonpath_to_assert.conf](../../../../seatunnel-e2e/seatunnel-connector-v2-e2e/connector-http-e2e/src/test/resources/http_jsonpath_to_assert.conf)。
+这样会把每个 JSONPath 的结果写入 `schema.fields` 中同名字段。
 
 ### pageing
 当前支持的分页类型是 `PageNumber` 和 `Cursor`。
