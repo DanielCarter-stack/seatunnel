@@ -27,8 +27,8 @@ delivers the query plan as a parameter to BE nodes, and then obtains data result
 | username                | string | yes      | -                 | StarRocks username.                                                                                     |
 | password                | string | yes      | -                 | StarRocks password.                                                                                     |
 | database                | string | yes      | -                 | StarRocks database name.                                                                                |
-| table                   | string | no       | -                 | StarRocks table name. Required when `table_list` is not configured.                                      |
-| table_list              | array  | no       | -                 | Tables to read. Required when `table` is not configured. Each entry can define its own `schema` and filter. |
+| table                   | string | exclusive with `table_list` | -       | StarRocks table name. Configure exactly one of `table` and `table_list`.                                   |
+| table_list              | array  | exclusive with `table` | -          | Tables to read. Configure exactly one of `table` and `table_list`. Each entry can define its own `schema` and filter. |
 | schema                  | config | no       | -                 | Output schema. Configure it at the top level for `table`, or inside each `table_list` entry for multi-table reads. |
 | scan_filter             | string | no       | ""                | Source-side filter expression passed to StarRocks.                                                      |
 | request_tablet_size     | int    | no       | Integer.MAX_VALUE | Maximum tablets in one SeaTunnel split. Smaller values can create more splits.                          |

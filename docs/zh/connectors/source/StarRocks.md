@@ -27,8 +27,8 @@ import ChangeLog from '../changelog/connector-starrocks.md';
 | username                | string | 是    | -                 | StarRocks 用户名。                                               |
 | password                | string | 是    | -                 | StarRocks 密码。                                                 |
 | database                | string | 是    | -                 | StarRocks 数据库名。                                             |
-| table                   | string | 否    | -                 | StarRocks 表名。未配置 `table_list` 时必须配置。                    |
-| table_list              | array  | 否    | -                 | 要读取的表列表。未配置 `table` 时必须配置，每个表项可单独配置 `schema` 和过滤条件。 |
+| table                   | string | 与 `table_list` 互斥 | -       | StarRocks 表名。`table` 和 `table_list` 必须二选一配置。                    |
+| table_list              | array  | 与 `table` 互斥 | -          | 要读取的表列表。`table` 和 `table_list` 必须二选一配置，每个表项可单独配置 `schema` 和过滤条件。 |
 | schema                  | config | 否    | -                 | 输出数据结构。读取单表时配置在顶层，读取多表时配置在每个 `table_list` 表项中。     |
 | scan_filter             | string | 否    | ""                | 下推到 StarRocks 源端执行的过滤表达式。                              |
 | request_tablet_size     | int    | 否    | Integer.MAX_VALUE | 一个 SeaTunnel 分片最多包含的 tablet 数量，值越小通常分片越多。              |

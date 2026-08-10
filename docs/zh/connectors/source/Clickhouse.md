@@ -56,6 +56,7 @@ import ChangeLog from '../changelog/connector-clickhouse.md';
 | host              | String | 是      | -                      | `ClickHouse` 集群地址, 格式是`host:port` , 允许多个`hosts`配置. 例如 `"host1:8123,host2:8123"` . |
 | username          | String | 是      | -                      | `ClickHouse` user 用户账号.                                                           |
 | password          | String | 是      | -                      | `ClickHouse` user 用户密码.                                                           |
+| database          | String | 否       | -                      | 当 `table_list` 与 `sql` 都没有显式指定数据库时使用的默认 ClickHouse 数据库。                                                          |
 | table_list        | Array  | 否       | -                      | 要读取的数据表列表，支持配置多表.                                                                 |
 | clickhouse.config | Map    | 否       | -                      | 除了上述必须由 `clickhouse-jdbc` 指定的必填参数外，用户还可以指定多个可选参数，这些参数涵盖了 `clickhouse-jdbc` 提供的所有[参数](https://github.com/ClickHouse/clickhouse-jdbc/tree/master/clickhouse-client#configuration). |
 | server_time_zone  | String | 否       | ZoneId.systemDefault() | 数据库服务中的会话时区。如果未设置，则使用ZoneId.systemDefault（）设置服务时区.                                                                                                                                                                                |

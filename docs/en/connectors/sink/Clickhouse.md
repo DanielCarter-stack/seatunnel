@@ -19,6 +19,7 @@ import ChangeLog from '../changelog/connector-clickhouse.md';
 
 - [x] [support multiple table sink](../../introduction/concepts/connector-v2-features.md)
 - [x] [timer flush](../../introduction/concepts/connector-v2-features.md)
+- [x] [parallelism](../../introduction/concepts/connector-v2-features.md)
 
 ## Description
 
@@ -288,7 +289,7 @@ sink {
 
 In ClickHouse, create the following two data tables in advance:
 
-```
+```sql
 create table if not exists `default`.multi_sink_table1(
      `c_string`          String,
      `c_boolean`         Boolean,
@@ -309,9 +310,9 @@ comment '''N''-N';
 create table if not exists `default`.multi_sink_table2 as `default`.multi_sink_table1;
 ```
 
-Then, the configuration to be used is referred to as follows: 
+Then, the configuration to be used is referred to as follows:
 
-```
+```hocon
 env {
   parallelism = 1
   job.mode = "BATCH"

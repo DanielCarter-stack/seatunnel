@@ -20,8 +20,10 @@ Apache Iceberg 目标连接器支持 CDC 写入、自动建表、表结构变更
 
 ## 主要特性
 
+- [x] [精确一次](../../introduction/concepts/connector-v2-features.md)
 - [x] [cdc](../../introduction/concepts/connector-v2-features.md)
 - [x] [支持多表写入](../../introduction/concepts/connector-v2-features.md)
+- [ ] [定时刷新](../../introduction/concepts/connector-v2-features.md)
 
 ## 支持的数据源信息
 
@@ -79,12 +81,12 @@ libfb303-xxx.jar
 | iceberg.table.upsert-mode-enabled      | boolean | no   | false                        | 设置为 `true` 以启用 upsert 模式，默认值为 `false`                                                                                                                                                                             |
 | schema_save_mode                       | Enum    | no   | CREATE_SCHEMA_WHEN_NOT_EXIST | schema 变更方式, 请参考下面的 `schema_save_mode`                                                                                                                                                                            |
 | data_save_mode                         | Enum    | no   | APPEND_DATA                  | 数据写入方式, 请参考下面的 `data_save_mode`                                                                                                                                                                                   |
-| custom_sql                             | string  | 当 `data_save_mode` 为 `CUSTOM_PROCESSING` 时是 | -                            | `CUSTOM_PROCESSING` 数据写入方式使用的自定义 `delete` SQL，例如 `delete from ... where ...`。                                                                                                                                       |
-| iceberg.table.commit-branch            | string  | no   | -                            | 提交的默认分支                                                                                                                                                                                                           |
-| multi_table_sink_replica               | int     | no   | -                            | 多表写入模式下每张表对应的 Sink 写入并发数。一个作业写入多张 Iceberg 表，并且每张表都需要多个写入器时使用。                                                                                                                                                                                                           |
-| krb5_path                              | string  | no       | /etc/krb5.conf              | `krb5.conf` 文件的路径，用于 Kerberos 认证。                                                                                                                                                                                                                                                                |
-| kerberos_principal                     | string  | no       | -                            | Kerberos 认证的 principal。                                                                                                                                                                                                                                                                               |
-| kerberos_keytab_path                   | string  | no       | -                            | Kerberos 认证的 keytab 文件路径。                                                                                                                                                                                                                                                                         |
+| custom_sql                             | string  | 当 `data_save_mode` 为 `CUSTOM_PROCESSING` 时必填 | -                  | `CUSTOM_PROCESSING` 数据写入方式使用的自定义 `delete` SQL，例如 `delete from ... where ...`。                                                                                                                                       |
+| iceberg.table.commit-branch            | string  | 否   | -                            | 提交的默认分支                                                                                                                                                                                                           |
+| multi_table_sink_replica               | int     | 否   | -                            | 多表写入模式下每张表对应的 Sink 写入并发数。一个作业写入多张 Iceberg 表，并且每张表都需要多个写入器时使用。                                                                                                                                                                                                           |
+| krb5_path                              | string  | 否       | /etc/krb5.conf              | `krb5.conf` 文件的路径，用于 Kerberos 认证。                                                                                                                                                                                                                                                                |
+| kerberos_principal                     | string  | 否       | -                            | Kerberos 认证的 principal。                                                                                                                                                                                                                                                                               |
+| kerberos_keytab_path                   | string  | 否       | -                            | Kerberos 认证的 keytab 文件路径。                                                                                                                                                                                                                                                                         |
 
 ## Sink 选项说明
 
@@ -248,12 +250,12 @@ sink {
     table = "user_data"
 
     iceberg.catalog.config = {
-      type: "rest"
-      warehouse: "arn:aws:s3tables:<Region>:<accountID>:bucket/<bucketname>"
-      uri: "https://s3tables.<Region>.amazonaws.com/iceberg"
-      rest.sigv4-enabled: "true"
-      rest.signing-name: "s3tables"
-      rest.signing-region: "<Region>"
+      type = "rest"
+      warehouse = "arn:aws:s3tables:<Region>:<accountID>:bucket/<bucketname>"
+      uri = "https://s3tables.<Region>.amazonaws.com/iceberg"
+      rest.sigv4-enabled = "true"
+      rest.signing-name = "s3tables"
+      rest.signing-region = "<Region>"
     }
   }
 }

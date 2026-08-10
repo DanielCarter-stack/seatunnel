@@ -82,6 +82,7 @@ libfb303-xxx.jar
 | paimon.hadoop.conf           | Map  | 否    | -                            | Hadoop配置文件属性信息                                                                                       |
 | paimon.hadoop.conf-path      | 字符串  | 否    | -                            | Hadoop配置文件目录，用于加载'core-site.xml', 'hdfs-site.xml', 'hive-site.xml'文件配置                               |
 | paimon.table.non-primary-key | Boolean | 否    | false                        | 控制创建主键表或者非主键表. 当为true时,创建非主键表, 为false时,创建主键表                                                         |
+| multi_table_sink_replica   | int     | 否    | 1                            | 多表写入模式下每张表对应的 Sink 写入并发数。一个作业写入多张 Paimon 表，并且每张表都需要多个写入器时使用。                                              |
 | branch                       | 字符串  | 否    | -                            | 要写入数据的 Paimon 表分支名称。不配置时写入 main 分支。非 main 分支要求 main 表和目标分支已存在，且不支持 `schema_save_mode=RECREATE_SCHEMA` 或 `data_save_mode=DROP_DATA`。 |
 
 ### table_options [Map]

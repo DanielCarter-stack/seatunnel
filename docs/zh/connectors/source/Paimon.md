@@ -41,8 +41,9 @@ import ChangeLog from '../changelog/connector-paimon.md';
 - [x] [流处理](../../introduction/concepts/connector-v2-features.md)
 - [ ] [精确一次](../../introduction/concepts/connector-v2-features.md)
 - [x] [列投影](../../introduction/concepts/connector-v2-features.md)
-- [ ] [并行度](../../introduction/concepts/connector-v2-features.md)
+- [x] [并行度](../../introduction/concepts/connector-v2-features.md)
 - [ ] [支持用户自定义分片](../../introduction/concepts/connector-v2-features.md)
+- [x] [支持多表读](../../introduction/concepts/connector-v2-features.md)
 
 ## 配置选项
 
@@ -52,7 +53,7 @@ import ChangeLog from '../changelog/connector-paimon.md';
 | catalog_name            | String   | 否      | paimon        |
 | catalog_type            | String   | 否      | filesystem    |
 | catalog_uri             | String   | 当 `catalog_type` 为 `hive` 时是 | -             |
-| database                | String   | 是      | -             |
+| database                | String   | 否      | -             |
 | table                   | String   | 未配置 `table_list` 时是 | -             |
 | table_list              | array    | 未配置 `table` 时是 | -             |
 | user                    | String   | 否      | -             |
@@ -122,7 +123,7 @@ SELECT * FROM table /*+ OPTIONS('incremental-between' = 'test-tag1,test-tag2') *
 * timestamp 
 * time
 
-### paimon.hadoop.conf [string]
+### paimon.hadoop.conf [Map]
 
 hadoop conf 属性
 
@@ -272,7 +273,7 @@ source {
 }
 ```
 
-## Changelog
+## 读取 Paimon Changelog
 
 如果要读取 paimon 表的 changelog，首先要为 Paimon 源表设置 `changelog-producer`，然后使用 SeaTunnel 流任务读取。
 

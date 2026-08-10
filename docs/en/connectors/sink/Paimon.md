@@ -82,6 +82,7 @@ libfb303-xxx.jar
 | paimon.hadoop.conf           | Map     | No       | -                            | Properties in hadoop conf                                                                                                                                        |
 | paimon.hadoop.conf-path      | String  | No       | -                            | The specified loading path for the 'core-site.xml', 'hdfs-site.xml', 'hive-site.xml' files                                                                       |
 | paimon.table.non-primary-key | Boolean | No       | false                        | Switch to create `table with PK` or `table without PK`. true : `table without PK`, false : `table with PK`                                                       |
+| multi_table_sink_replica   | int     | No       | 1                            | Replica number for every table writer in multi-table sink mode. Use this when one upstream job writes to multiple Paimon tables and each table needs more than one sink writer.                                              |
 | branch                       | String  | No       | -                            | The branch name of Paimon table to write data to. If omitted, data is written to the main branch. For non-main branches, the main table and target branch must already exist, and `schema_save_mode=RECREATE_SCHEMA` or `data_save_mode=DROP_DATA` is not supported. |
 
 ### table_options [Map]
@@ -116,7 +117,7 @@ sink {
 When you set `checkpoint.interval` to a value greater than 0 in batch mode, the paimon connector will commit the data to the paimon table when the checkpoint triggers after a certain number of records have been written. At this moment, the written data in paimon that is visible. 
 However, if you do not set `checkpoint.interval` in batch mode, the paimon sink connector will commit the data after all records are written. The written data in paimon that is not visible until the batch task completes.
 
-## Changelog
+## Changelog Producer
 You must configure the `changelog-producer=input` option to enable the changelog producer mode of the paimon table. If you use the auto-create table function of paimon sink, you can configure this property in `paimon.table.write-props` or `table_options`.
 
 The changelog producer mode of the paimon table has [four mode](https://paimon.apache.org/docs/master/primary-key-table/changelog-producer/) which is `none`、`input`、`lookup` and `full-compaction`.

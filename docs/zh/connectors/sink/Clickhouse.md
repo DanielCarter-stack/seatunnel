@@ -288,7 +288,7 @@ sink {
 
 在ClickHouse中提前创建下面两张数据表：
 
-```
+```sql
 create table if not exists `default`.multi_sink_table1(
      `c_string`          String,
      `c_boolean`         Boolean,
@@ -311,7 +311,7 @@ create table if not exists `default`.multi_sink_table2 as `default`.multi_sink_t
 
 然后使用的配置参考如下：
 
-```
+```hocon
 env {
   parallelism = 1
   job.mode = "BATCH"

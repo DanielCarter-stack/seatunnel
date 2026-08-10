@@ -41,8 +41,9 @@ Read data from Apache Paimon.
 - [x] [stream](../../introduction/concepts/connector-v2-features.md)
 - [ ] [exactly-once](../../introduction/concepts/connector-v2-features.md)
 - [x] [column projection](../../introduction/concepts/connector-v2-features.md)
-- [ ] [parallelism](../../introduction/concepts/connector-v2-features.md)
+- [x] [parallelism](../../introduction/concepts/connector-v2-features.md)
 - [ ] [support user-defined split](../../introduction/concepts/connector-v2-features.md)
+- [x] [support multiple table read](../../introduction/concepts/connector-v2-features.md)
 
 ## Options
 
@@ -52,7 +53,7 @@ Read data from Apache Paimon.
 | catalog_name            | String   | No             | paimon        |
 | catalog_type            | String   | No             | filesystem    |
 | catalog_uri             | String   | Yes when `catalog_type` is `hive` | -             |
-| database                | String   | Yes            | -             |
+| database                | String   | No             | -             |
 | table                   | String   | Yes when `table_list` is absent | -             |
 | table_list              | array    | Yes when `table` is absent | -             |
 | user                    | String   | No             | -             |
@@ -117,7 +118,7 @@ The field data types currently supported by where conditions are as follows:
 * timestamp
 * time
 
-### paimon.hadoop.conf [string]
+### paimon.hadoop.conf [Map]
 
 Properties in hadoop conf
 
@@ -253,7 +254,7 @@ source {
 }
 ```
 
-## Changelog
+## Reading Paimon Changelog
 If you want to read the changelog of the Paimon table, first set the `changelog-producer` for the Paimon source table and then use the SeaTunnel stream task to read it.
 
 ### Note

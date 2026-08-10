@@ -20,8 +20,10 @@ Sink connector for Apache Iceberg. It supports CDC writes, automatic table creat
 
 ## Key features
 
+- [x] [exactly-once](../../introduction/concepts/connector-v2-features.md)
 - [x] [cdc](../../introduction/concepts/connector-v2-features.md)
 - [x] [support multiple table write](../../introduction/concepts/connector-v2-features.md)
+- [ ] [timer flush](../../introduction/concepts/connector-v2-features.md)
 
 ## Supported DataSource Info
 
@@ -87,6 +89,23 @@ libfb303-xxx.jar
 | kerberos_keytab_path                   | string  | no       | -                            | The keytab file path for Kerberos authentication.                                                                                                                                                                                                                                                                         |
 
 ## Sink Option descriptions
+
+### schema_save_mode [Enum]
+
+Controls what the connector does with the target table before it writes rows.
+
+- `CREATE_SCHEMA_WHEN_NOT_EXIST`: create the table when it does not exist; skip when it does.
+- `RECREATE_SCHEMA`: drop and recreate the table on every job start.
+- `ERROR_WHEN_SCHEMA_NOT_EXIST`: fail the job if the table does not exist.
+- `IGNORE`: leave existing tables untouched.
+
+### data_save_mode [Enum]
+
+Controls how existing rows in the target table are handled when the job starts.
+
+- `APPEND_DATA`: append rows to the existing data.
+- `OVERWRITE`: replace the existing data with the new rows.
+- `CUSTOM_PROCESSING`: run the user-supplied `custom_sql` instead of the generated upsert.
 
 ### iceberg.table.upsert-mode-enabled [boolean]
 
@@ -275,12 +294,12 @@ sink {
     table = "user_data"
 
     iceberg.catalog.config = {
-      type: "rest"
-      warehouse: "arn:aws:s3tables:<Region>:<accountID>:bucket/<bucketname>"
-      uri: "https://s3tables.<Region>.amazonaws.com/iceberg"
-      rest.sigv4-enabled: "true"
-      rest.signing-name: "s3tables"
-      rest.signing-region: "<Region>"
+      type = "rest"
+      warehouse = "arn:aws:s3tables:<Region>:<accountID>:bucket/<bucketname>"
+      uri = "https://s3tables.<Region>.amazonaws.com/iceberg"
+      rest.sigv4-enabled = "true"
+      rest.signing-name = "s3tables"
+      rest.signing-region = "<Region>"
     }
   }
 }
