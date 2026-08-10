@@ -6,9 +6,9 @@ import ChangeLog from '../changelog/connector-maxcompute.md';
 
 ## 描述
 
-用于从 Maxcompute 读取数据.
+用于从 Maxcompute 读取数据。
 
-## 关键特性
+## 主要特性
 
 - [x] [批处理](../../introduction/concepts/connector-v2-features.md)
 - [ ] [精确一次](../../introduction/concepts/connector-v2-features.md)
@@ -25,12 +25,14 @@ import ChangeLog from '../changelog/connector-maxcompute.md';
 | sts_token      | string | 否  | -             |
 | endpoint       | string | 是  | -             |
 | project        | string | 是  | -             |
-| table_name     | string | 是  | -             |
+| table_name     | string | 未配置 `table_list` 时必填 | -             |
 | schema_name    | string | 否  | -             |
 | partition_spec | string | 否  | -             |
 | split_row      | int    | 否 | 10000         |
 | read_columns   | Array  | 否 | -             |
 | table_list     | Array  | 否 | -             |
+| tunnel_endpoint | string | 否 | -             |
+| tunnel_name     | string | 否 | -             |
 | common-options | string | 否 |               |
 | schema         | config | 否 |               |
 
@@ -51,19 +53,21 @@ import ChangeLog from '../changelog/connector-maxcompute.md';
 
 ### endpoint [string]
 
-`endpoint` 您的 Maxcompute 端点以 http 开头.
+`endpoint` 您的 Maxcompute 端点，以 http 开头。
 
 ### project [string]
 
-`project` 您在阿里云中创建的Maxcompute项目.
+`project` 您在阿里云中创建的 Maxcompute 项目。
 
 ### table_name [string]
 
-`table_name` 目标Maxcompute表名，例如：fake.
+`table_name` 目标 Maxcompute 表名，例如：`fake`。
+
+`table_name` 和 `table_list` 不能同时配置。读取单表时使用 `table_name`，读取多表时使用 `table_list`。
 
 ### partition_spec [string]
 
-`partition_spec` Maxcompute分区表的此规范，例如:ds='20220101'.
+`partition_spec` Maxcompute 分区表的规范，例如: ds='20220101'。
 
 ### schema_name [string]
 
@@ -85,7 +89,51 @@ import ChangeLog from '../changelog/connector-maxcompute.md';
 
 ### table_list [Array]
 
-要读取的表列表，您可以使用此配置代替 `table_name`.
+要读取的表列表，您可以使用此配置代替 `table_name`。
+
+每个表配置项都必须包含 `table_name`，也可以单独覆盖 `project`、`schema_name`、`partition_spec`、`split_row` 和 `read_columns`。如果表配置项没有设置这些值，连接器会使用顶层配置。
+
+当一个任务需要用同一组账号、endpoint 和默认 project 读取多张 MaxCompute 表时，可以使用该模式。
+
+### tunnel_endpoint [String]
+
+MaxCompute Tunnel 服务的自定义端点。未配置时，连接器会根据区域自动推断默认 Tunnel 端点。
+一般只有自定义网络、调试或本地开发时才需要配置，例如 `http://maxcompute:8080`。
+
+### tunnel_endpoint [String]
+
+指定 MaxCompute Tunnel 服务的自定义端点 URL。
+
+默认情况下，端点是从配置的区域自动推断的。
+
+此选项允许您覆盖默认行为并使用自定义 Tunnel 端点。
+如果未指定，连接器将使用基于区域的默认 Tunnel 端点。
+
+通常，您**不需要**设置 tunnel_endpoint。仅在自定义网络、调试或本地开发时才需要。
+
+示例值：
+
+- `https://dt.cn-hangzhou.maxcompute.aliyun.com`
+- `https://dt.ap-southeast-1.maxcompute.aliyun.com`
+- `http://maxcompute:8080`
+
+默认值：未设置（从区域自动推断）
+
+### tunnel_name [String]
+
+`tunnel_name` 指定 Tunnel Quota 名称，用于独占资源组。
+
+Tunnel Quota 允许您使用专用的计算资源进行 MaxCompute Tunnel 数据传输，从而提供更好的性能和资源隔离。
+
+**重要提示**：Tunnel Quota 仅在 **VPC（虚拟私有云）端点**下生效，暂不支持公共网络访问。使用 `tunnel_name` 时，必须同时配置 `endpoint` 和 `tunnel_endpoint` 为 VPC 端点。
+
+如果未指定，将使用默认的 Tunnel quota。
+
+示例值：
+
+- `your_tunnel_quota_name`
+
+默认值：未设置（使用默认 quota）
 
 ### common options
 
@@ -103,6 +151,7 @@ source {
     endpoint="<http://service.odps.aliyun.com/api>"
     project="<your project>"
     table_name="<your table name>"
+    #tunnel_endpoint="<your tunnel endpoint>"
     #partition_spec="<your partition spec>"
     #split_row = 10000
     #read_columns = ["col1", "col2"]
@@ -119,6 +168,7 @@ source {
     accesskey="<your access Key>"
     endpoint="<http://service.odps.aliyun.com/api>"
     project="<your project>" # default project
+    #tunnel_endpoint="<your tunnel endpoint>"
     table_list = [
       {
         table_name = "test_table"

@@ -22,6 +22,7 @@ import ChangeLog from '../changelog/connector-iceberg.md';
 - [x] [column projection](../../introduction/concepts/connector-v2-features.md)
 - [x] [parallelism](../../introduction/concepts/connector-v2-features.md)
 - [ ] [support user-defined split](../../introduction/concepts/connector-v2-features.md)
+- [x] [support multiple table read](../../introduction/concepts/connector-v2-features.md)
 - [x] data format
   - [x] parquet
   - [x] orc
@@ -75,10 +76,10 @@ libfb303-xxx.jar
 
 | Name                     | Type    | Required | Default              | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 |--------------------------|---------|----------|----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| catalog_name             | string  | yes      | -                    | User-specified catalog name.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| namespace                | string  | yes      | -                    | The iceberg database name in the backend catalog.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| table                    | string  | no       | -                    | The iceberg table name in the backend catalog.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| table_list               | string  | no       | -                    | The iceberg table list in the backend catalog.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| catalog_name             | string  | no       | default               | User-specified catalog name. Defaults to `default` when the catalog configuration is omitted.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| namespace                | string  | no       | default               | The iceberg database name in the backend catalog. Defaults to `default`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| table                    | string  | exclusive with `table_list` | -    | The Iceberg table name in the backend catalog. Configure exactly one of `table` and `table_list`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| table_list               | list    | exclusive with `table` | -          | The Iceberg table list in the backend catalog. Configure exactly one of `table` and `table_list`. Each item supports `namespace`, `table`, `query`, `startSnapshotId`, `startSnapshotTimestamp`, `endSnapshotId`, `useSnapshotId`, `useSnapshotTimestamp`, `streamScanStrategy`.                                                                                                                                                                                                                                                                                                                                                                      |
 | iceberg.catalog.config   | map     | yes      | -                    | Specify the properties for initializing the Iceberg catalog, which can be referenced in this file: [CatalogProperties.java](https://github.com/apache/iceberg/blob/main/core/src/main/java/org/apache/iceberg/CatalogProperties.java)                                                                                                                                                                                                                                                                                                                                                                                                             |
 | hadoop.config            | map     | no       | -                    | Properties passed through to the Hadoop configuration                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | iceberg.hadoop-conf-path | string  | no       | -                    | The specified loading paths for the 'core-site.xml', 'hdfs-site.xml', 'hive-site.xml' files.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
@@ -92,7 +93,7 @@ libfb303-xxx.jar
 | stream_scan_strategy     | enum    | no       | FROM_LATEST_SNAPSHOT | Starting strategy for stream mode execution, Default to use `FROM_LATEST_SNAPSHOT` if don't specify any value,The optional values are:<br/>TABLE_SCAN_THEN_INCREMENTAL: Do a regular table scan then switch to the incremental mode.<br/>FROM_LATEST_SNAPSHOT: Start incremental mode from the latest snapshot inclusive.<br/>FROM_EARLIEST_SNAPSHOT: Start incremental mode from the earliest snapshot inclusive.<br/>FROM_SNAPSHOT_ID: Start incremental mode from a snapshot with a specific id inclusive.<br/>FROM_SNAPSHOT_TIMESTAMP: Start incremental mode from a snapshot with a specific timestamp inclusive. |
 | increment.scan-interval  | long    | no       | 2000                 | The interval of increment scan(mills)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | common-options           |         | no       | -                    | Source plugin common parameters, please refer to [Source Common Options](../common-options/source-common-options.md) for details.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| query                    | String  | no       | -                    | The select DML to select the iceberg data. It mustn't contain the table name, and doesn’t support alias. For example: `select * from table where f1 > 100`, `select fn from table where f1 > 100`. The current support for the LIKE syntax is limited: the LIKE clause shouldn't start with `%`. The supported one is: `select f1 from t where f2 like 'tom%'  `                                                                                                                                                                                                                                                       |
+| query                    | String  | no       | -                    | The select DML used to filter or project Iceberg data. Use any table alias in the query (the actual table name is bound at runtime); for example, both `select * from t where f1 > 100` and `select f1 from t where f2 like 'tom%'` are supported. The current LIKE support is limited: the LIKE pattern should not start with `%`.                                                                                                                                                                      |
 | krb5_path                              | string  | no       | /etc/krb5.conf              | The path to the `krb5.conf` file for Kerberos authentication.                                                                                                                                                                                                                                                                |
 | kerberos_principal                     | string  | no       | -                            | The principal for Kerberos authentication.                                                                                                                                                                                                                                                                               |
 | kerberos_keytab_path                   | string  | no       | -                            | The path to the keytab file for Kerberos authentication.                                                                                                                                                                                                                                                                         |
@@ -134,6 +135,8 @@ sink {
 
 ### Multi-Table Read
 
+Use `table_list` when one Iceberg source needs to read more than one table. Do not set `table` at the same time.
+
 ```hocon
 source {
   Iceberg {
@@ -145,10 +148,10 @@ source {
     namespace = "database1"
     table_list = [
       {
-        table = "table_1
+        table = "table_1"
       },
       {
-        table = "table_2
+        table = "table_2"
         query = "select fn from table where f1 > 100"
       }
     ]
@@ -193,7 +196,6 @@ source {
       uri = "thrift://localhost:9083"
       warehouse = "hdfs://your_cluster//tmp/seatunnel/iceberg/"
     }
-    catalog_type = "hive"
 
     namespace = "your_iceberg_database"
     table = "your_iceberg_table"
@@ -250,6 +252,48 @@ source {
         f4 = "bigint"
       }
     }
+  }
+}
+```
+
+### Query Filter on a Single Table
+
+Apply a server-side `WHERE` and column projection via the `query` option. Any table alias works; the connector binds it to the configured Iceberg table at runtime.
+
+```hocon
+source {
+  Iceberg {
+    catalog_name = "seatunnel"
+    iceberg.catalog.config = {
+      type = "hadoop"
+      warehouse = "file:///tmp/seatunnel/iceberg/hadoop/"
+    }
+    namespace = "database1"
+    table = "source"
+    query = "select f1, f2 from t where f1 = 10"
+  }
+}
+```
+
+### Query Filter per Table in `table_list`
+
+For multi-table mode, push the same filter down into individual `table_list` entries so each table ships only the rows and columns you need.
+
+```hocon
+source {
+  Iceberg {
+    catalog_name = "seatunnel"
+    iceberg.catalog.config = {
+      type = "hadoop"
+      warehouse = "file:///tmp/seatunnel/iceberg/hadoop/"
+    }
+    namespace = "database1"
+    table_list = [
+      {
+        table = "source"
+        query = "select f1, f16 from t where f1 = 10"
+      }
+    ]
   }
 }
 ```

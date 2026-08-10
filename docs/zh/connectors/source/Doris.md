@@ -22,7 +22,7 @@ import ChangeLog from '../changelog/connector-doris.md';
 
 ## 描述
 
-用于 Apache Doris 的源连接器。
+用于 Apache Doris 的源连接器。Doris source 仅支持批处理模式。如需 CDC 风格的接入，请使用 CDC 源（如 MySQL-CDC），再写入 Doris Sink。
 
 ## 依赖
 
@@ -54,9 +54,12 @@ import ChangeLog from '../changelog/connector-doris.md';
 | FLOAT                                | FLOAT                                                                                                                                               |
 | DOUBLE                               | DOUBLE                                                                                                                                              |
 | CHAR<br/>VARCHAR<br/>STRING<br/>TEXT | STRING                                                                                                                                              |
+| JSON                                 | STRING                                                                                                                                              |
+| VARIANT                              | STRING                                                                                                                                              |
 | DATE                                 | DATE                                                                                                                                                |
 | DATETIME<br/>DATETIME(p)             | TIMESTAMP                                                                                                                                           |
 | ARRAY                                | ARRAY                                                                                                                                               |
+| MAP                                  | MAP                                                                                                                                                 |
 
 ## 源选项
 
@@ -64,28 +67,38 @@ import ChangeLog from '../changelog/connector-doris.md';
 
 |               名称                |  类型   | 是否必须  |  默认值     |                                             描述                                                     |
 |----------------------------------|--------|----------|------------|-----------------------------------------------------------------------------------------------------|
-| fenodes                          | string | yes      | -          | FE 地址, 格式：`"fe_host:fe_http_port"`                                                               |
-| username                         | string | yes      | -          | 用户名                                                                                               |
-| password                         | string | yes      | -          | 密码                                                                                                 |
+| fenodes                          | string | 是       | -          | FE 地址, 格式：`"fe_host:fe_http_port"`                                                               |
+| username                         | string | 是       | -          | 用户名                                                                                               |
+| password                         | string | 是       | -          | 密码                                                                                                 |
+| database                         | string | 条件必填 | -          | Doris 数据库名称。当未配置 `table_list` 时必须配置。                                                  |
+| table                            | string | 条件必填 | -          | Doris 表名。当未配置 `table_list` 时必须配置。                                                      |
+| doris.batch.size                 | int    | 否       | 1024       | 每次能够从 BE 中读取到的最大行数。                                                                      |
+| case_sensitive                   | boolean | 否      | true       | 是否保留表名和列名的原始大小写。设置为 false 时名称会被转换为小写。                                       |
 | doris.request.retries            | int    | no       | 3          | 请求Doris FE的重试次数                                                                                 |
-| doris.request.read.timeout.ms    | int    | no       | 30000      |                                                                                                     |
-| doris.request.connect.timeout.ms | int    | no       | 30000      |                                                                                                     |
-| query-port                       | string | no       | 9030       | Doris查询端口                                                                                         |
+| doris.request.read.timeout.ms    | int    | no       | 30000      | 请求 Doris BE 的 socket 读取超时时间。                                                                 |
+| doris.request.connect.timeout.ms | int    | no       | 30000      | 请求 Doris FE 或 BE 的连接超时时间。                                                                    |
+| query-port                       | int    | no       | 9030       | Doris 查询端口。                                                                                       |
 | doris.request.query.timeout.s    | int    | no       | 3600       | Doris扫描数据的超时时间，单位秒                                                                          |
-| table_list                       | string | 否       | -           | 表清单                                                                                               |
+| doris.request.tablet.size        | int    | no       | Integer.MAX_VALUE | 每个 SeaTunnel split 包含的 Doris tablet 数量，最小值为 `1`。                                  |
+| doris.deserialize.arrow.async    | boolean | no      | false      | 是否异步反序列化 Arrow 数据。                                                                           |
+| doris.request.retriesdoris.deserialize.queue.size | int | no | 64 | 异步反序列化 Arrow 数据时使用的队列大小。                                                                |
+| table_list                       | Array  | 否       | -          | 要读取的 Doris 表清单。每个条目支持 `database`、`table`、`doris.read.field`、`doris.filter.query`、`doris.request.tablet.size`、`doris.batch.size`、`doris.exec.mem.limit`。              |
+
+> 说明：`doris.request.retriesdoris.deserialize.queue.size` 是运行时实际使用的配置名（连接器为向后兼容保留了这个原始拼写）。调整异步 Arrow 反序列化队列大小时，请按这个完整名称配置。
 
 表清单配置:
 
 |               名称                |  类型   | 是否必须  |  默认值     |                                             描述                                                     |
 |----------------------------------|--------|----------|------------|-----------------------------------------------------------------------------------------------------|
-| database                         | string | yes      | -          | 数据库                                                                                               |
-| table                            | string | yes      | -          | 表名                                                                                                |
-| doris.read.field                 | string | no       | -          | 选择要读取的Doris表字段                                                                                |
-| doris.filter.query               | string | no       | -          | 数据过滤. 格式："字段 = 值", 例如：doris.filter.query = "F_ID > 2"                                       |
-| doris.batch.size                 | int    | no       | 1024       | 每次能够从BE中读取到的最大行数                                                                           |
-| doris.exec.mem.limit             | long   | no       | 2147483648 | 单个be扫描请求可以使用的最大内存。默认内存为2G（2147483648）                                                |
- 
-注意: 当此配置对应于单个表时，您可以将table_list中的配置项展平到外层。
+| database                         | string | 是（条目内）| -        | 数据库                                                                                               |
+| table                            | string | 是（条目内）| -        | 表名                                                                                                |
+| doris.read.field                 | string | 否       | -          | 选择要读取的Doris表字段                                                                                |
+| doris.filter.query               | string | 否       | -          | 数据过滤. 格式："字段 = 值", 例如：doris.filter.query = "F_ID > 2"                                       |
+| doris.request.tablet.size        | int    | 否       | Integer.MAX_VALUE | 当前表每个 SeaTunnel split 包含的 Doris tablet 数量，最小值为 `1`。                              |
+| doris.batch.size                 | int    | 否       | 1024       | 每次能够从BE中读取到的最大行数                                                                           |
+| doris.exec.mem.limit             | long   | 否       | 2147483648 | 单个be扫描请求可以使用的最大内存。默认内存为2G（2147483648）                                                |
+
+注意: 当此配置对应于单个表时，您可以将table_list中的配置项展平到外层。如果不配置 `table_list`，必须在 source 外层配置 `database` 和 `table`。
 
 ### 提示
 
@@ -113,7 +126,7 @@ source{
 
 transform {
     # If you would like to get more information about how to configure seatunnel and see full list of transform plugins,
-    # please go to https://seatunnel.apache.org/docs/transform/sql
+    # please go to https://seatunnel.apache.org/docs/transforms/sql
 }
 
 sink {
@@ -141,7 +154,7 @@ source{
 
 transform {
     # If you would like to get more information about how to configure seatunnel and see full list of transform plugins,
-    # please go to https://seatunnel.apache.org/docs/transform/sql
+    # please go to https://seatunnel.apache.org/docs/transforms/sql
 }
 
 sink {
@@ -169,7 +182,7 @@ source{
 
 transform {
     # If you would like to get more information about how to configure seatunnel and see full list of transform plugins,
-    # please go to https://seatunnel.apache.org/docs/transform/sql
+    # please go to https://seatunnel.apache.org/docs/transforms/sql
 }
 
 sink {
@@ -177,49 +190,90 @@ sink {
 }
 ```
 ### 多表
-```
-env{
+```hocon
+env {
   parallelism = 1
   job.mode = "BATCH"
 }
 
-source{
+source {
   Doris {
-      fenodes = "xxxx:8030"
-      username = root
-      password = ""
-      table_list = [
-          {
-            database = "st_source_0"
-            table = "doris_table_0"
-            doris.read.field = "F_ID,F_INT,F_BIGINT,F_TINYINT"
-            doris.filter.query = "F_ID >= 50"
-          },
-          {
-            database = "st_source_1"
-            table = "doris_table_1"
-          }
-      ]
+    fenodes = "doris_e2e:8030"
+    username = root
+    password = ""
+    table_list = [
+      {
+        database = "e2e_source_0"
+        table = "doris_e2e_unique_table_0"
+        doris.read.field = "F_ID,F_INT,F_BIGINT,F_TINYINT,F_SMALLINT,F_DECIMAL,F_LARGEINT,F_BOOLEAN,F_DOUBLE,F_FLOAT,F_CHAR,F_VARCHAR_11,F_STRING,F_DATETIME_P,F_DATETIME,F_DATE,MAP_VARCHAR_BOOLEAN,MAP_CHAR_TINYINT"
+        doris.filter.query = "F_ID >= 50"
+      },
+      {
+        database = "e2e_source_1"
+        table = "doris_e2e_unique_table_1"
+        doris.read.field = "F_ID,F_INT,F_BIGINT,F_TINYINT,F_SMALLINT,F_DECIMAL,F_LARGEINT,F_BOOLEAN,F_DOUBLE,F_FLOAT,F_CHAR,F_VARCHAR_11,F_STRING,F_DATETIME_P,F_DATETIME,F_DATE"
+        doris.filter.query = "F_ID < 40"
+      }
+    ]
   }
 }
 
 transform {}
 
-sink{
+sink {
   Doris {
-      fenodes = "xxxx:8030"
-      schema_save_mode = "RECREATE_SCHEMA"
-      username = root
-      password = ""
-      database = "st_sink"
-      table = "${table_name}"
-      sink.enable-2pc = "true"
-      sink.label-prefix = "test_json"
-      doris.config = {
-          format="json"
-          read_json_by_line="true"
-      }
+    fenodes = "doris_e2e:8030"
+    schema_save_mode = "RECREATE_SCHEMA"
+    username = root
+    password = ""
+    database = "e2e_sink"
+    table = "${table_name}"
+    sink.enable-2pc = "true"
+    sink.label-prefix = "test_json"
+    doris.config = {
+      format = "json"
+      read_json_by_line = "true"
+    }
   }
+}
+```
+
+### 多表 — 每个条目配置列与过滤
+
+使用 `table_list` 时，可在每个条目中通过 `doris.read.field` 与 `doris.filter.query` 仅读取每张 Doris 表所需的列并应用行级谓词。
+
+```hocon
+env {
+  parallelism = 1
+  job.mode = "BATCH"
+}
+
+source {
+  Doris {
+    fenodes = "doris_e2e:8030"
+    username = root
+    password = ""
+    table_list = [
+      {
+        database = "e2e_source_0"
+        table = "doris_e2e_unique_table_0"
+        doris.read.field = "F_ID,F_INT,F_BIGINT,F_TINYINT"
+        doris.filter.query = "F_ID >= 50"
+        doris.request.tablet.size = 1
+        doris.exec.mem.limit = 2147483648
+      },
+      {
+        database = "e2e_source_1"
+        table = "doris_e2e_unique_table_1"
+      }
+    ]
+  }
+}
+
+transform {}
+
+sink {
+  Console {}
 }
 ```
 

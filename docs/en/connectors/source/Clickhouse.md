@@ -57,6 +57,7 @@ They can be downloaded via install-plugin.sh or from the Maven central repositor
 | host              | String | Yes      | -                      | `ClickHouse` cluster address, the format is `host:port` , allowing multiple `hosts` to be specified. Such as `"host1:8123,host2:8123"` .                                                                                                                                                                    |
 | username          | String | Yes      | -                      | `ClickHouse` user username.                                                                                                                                                                                                                                                                                 |
 | password          | String | Yes      | -                      | `ClickHouse` user password.                                                                                                                                                                                                                                                                                 |
+| database          | String | No       | -                      | The default `ClickHouse` database used when neither `table_list` nor `sql` specifies one explicitly.                                                                                                                                                                                                                                          |
 | table_list        | Array  | NO       | -                      | The list of tables to be read.                                                                                                                                                                                                                                                                              |
 | clickhouse.config | Map    | No       | -                      | In addition to the above mandatory parameters that must be specified by `clickhouse-jdbc` , users can also specify multiple optional parameters, which cover all the [parameters](https://github.com/ClickHouse/clickhouse-jdbc/tree/master/clickhouse-client#configuration) provided by `clickhouse-jdbc`. |
 | server_time_zone  | String | No       | ZoneId.systemDefault() | The session time zone in database server. If not set, then ZoneId.systemDefault() is used to determine the server time zone.                                                                                                                                                                                |
@@ -70,9 +71,10 @@ Table list configuration:
 | sql               | String | NO       | -                      | The query sql used to search data though Clickhouse server.                                                                                                                                                                                                                                                 |
 | filter_query      | String | NO       | -                      | Data filtering in Clickhouse. the format is "field = value", example : filter_query = "id > 2 and type = 1"                                                                                                                                                                                                 |
 | partition_list    | Array  | NO       | -                      | Table partition list to filter the specified partition. If it is a partitioned table, this field can be configured to filter the data of the specified partition. example: partition_list = ["20250615", "20250616"]                                                                                        |
+| split_size        | int    | NO       | Integer.MAX_VALUE      | The number of ClickHouse parts grouped into each SeaTunnel split when configured inside `table_list`. Use `split.size` only when this option is flattened to the outer source level. The minimum value is `1`. Smaller values create more splits for higher parallelism.                                         |
 | batch_size        | int    | NO       | 1024                   | The maximum rows of data that can be obtained by reading from Clickhouse once.                                                                                                                                                                                                                              |
 
-Note: When this configuration corresponds to a single table, you can flatten the configuration items in table_list to the outer layer.
+Note: When this configuration corresponds to a single table, you can flatten the configuration items in table_list to the outer layer. In that flattened form, configure `split.size` instead of `split_size`.
 
 ## Parallel Reader
 The Clickhouse source connector supports parallel reading of data.
@@ -87,7 +89,8 @@ If both the `table_path` and `sql` parameters are set, it will be executed in sq
 ## Tips
 In query table mode, if you don't want to read the entire table, you can specify the `partition_list` or `filter_query` parameter. 
 * `partition_list`: filter the data of the specified partition
-* `filter_query`: filter the data based on the specified conditions
+* `filter_query`: filter the data based on the specified conditions. It can also be used together with `sql`; SeaTunnel applies it as an additional ClickHouse-side filter.
+* `split.size`: control how many ClickHouse parts are grouped into one SeaTunnel split when reading by `table_path`
 
 The `batch_size` parameter can be used to control the amount of data read each time to avoid OOM exception when reading a large amount of data. Appropriately increasing this value will help to improve the performance of the reading process.
 
@@ -114,6 +117,7 @@ source {
     server_time_zone = "UTC"
     partition_list = ["20250615", "20250616"]
     filter_query = "id > 2 and type = 1"
+    split.size = 1
     batch_size = 1024
     clickhouse.config = {
       "socket_timeout": "300000"
@@ -213,6 +217,7 @@ source {
       {
         table_path = "default.table2"
         sql = "select * from default.table2 where age > 18"
+        split_size = 1
       }
     ]
     server_time_zone = "UTC"

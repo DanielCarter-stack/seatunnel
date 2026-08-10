@@ -16,11 +16,14 @@ import ChangeLog from '../changelog/connector-iceberg.md';
 
 ## Description
 
-Sink connector for Apache Iceberg. It can support cdc mode 、auto create table and table schema evolution.
+Sink connector for Apache Iceberg. It supports CDC writes, automatic table creation, table schema evolution, and multi-table write jobs.
 
 ## Key features
 
+- [x] [exactly-once](../../introduction/concepts/connector-v2-features.md)
+- [x] [cdc](../../introduction/concepts/connector-v2-features.md)
 - [x] [support multiple table write](../../introduction/concepts/connector-v2-features.md)
+- [ ] [timer flush](../../introduction/concepts/connector-v2-features.md)
 
 ## Supported DataSource Info
 
@@ -78,13 +81,47 @@ libfb303-xxx.jar
 | iceberg.table.upsert-mode-enabled      | boolean | no       | false                        | Set to `true` to enable upsert mode, default is `false`                                                                                                                                                                                                                                                                   |
 | schema_save_mode                       | Enum    | no       | CREATE_SCHEMA_WHEN_NOT_EXIST | the schema save mode, please refer to `schema_save_mode` below                                                                                                                                                                                                                                                            |
 | data_save_mode                         | Enum    | no       | APPEND_DATA                  | the data save mode, please refer to `data_save_mode` below                                                                                                                                                                                                                                                                |
-| custom_sql                             | string  | no       | -                            | Custom `delete` data sql for data save mode. e.g: `delete from ... where ...`                                                                                                                                                                                                                                             |
+| custom_sql                             | string  | Required when `data_save_mode` is `CUSTOM_PROCESSING` | -                            | Custom `delete` SQL for `CUSTOM_PROCESSING` data save mode, for example `delete from ... where ...`.                                                                                                                                                                                                                     |
 | iceberg.table.commit-branch            | string  | no       | -                            | Default branch for commits                                                                                                                                                                                                                                                                                                |
+| multi_table_sink_replica               | int     | no       | -                            | Replica number for every table writer in multi-table sink mode. Use this when one upstream job writes to multiple Iceberg tables and each table needs more than one sink writer.                                                                                                                                           |
 | krb5_path                              | string  | no       | /etc/krb5.conf              | The path of `krb5.conf`, used for Kerberos authentication.                                                                                                                                                                                                                                                                |
 | kerberos_principal                     | string  | no       | -                            | The principal for Kerberos authentication.                                                                                                                                                                                                                                                                               |
 | kerberos_keytab_path                   | string  | no       | -                            | The keytab file path for Kerberos authentication.                                                                                                                                                                                                                                                                         |
 
 ## Sink Option descriptions
+
+### schema_save_mode [Enum]
+
+Controls what the connector does with the target table before it writes rows.
+
+- `CREATE_SCHEMA_WHEN_NOT_EXIST`: create the table when it does not exist; skip when it does.
+- `RECREATE_SCHEMA`: drop and recreate the table on every job start.
+- `ERROR_WHEN_SCHEMA_NOT_EXIST`: fail the job if the table does not exist.
+- `IGNORE`: leave existing tables untouched.
+
+### data_save_mode [Enum]
+
+Controls how existing rows in the target table are handled when the job starts.
+
+- `APPEND_DATA`: append rows to the existing data.
+- `OVERWRITE`: replace the existing data with the new rows.
+- `CUSTOM_PROCESSING`: run the user-supplied `custom_sql` instead of the generated upsert.
+
+### iceberg.table.upsert-mode-enabled [boolean]
+
+When this option is `true`, `iceberg.table.primary-keys` must be configured explicitly. The sink does not inherit primary keys from the source table automatically.
+
+### iceberg.table.partition-keys [string]
+
+Use a comma-separated list, for example `dt,region` or Iceberg transforms such as `days(ts)`. In multi-table jobs, `${partition_keys}` can be used as a placeholder from the upstream table metadata.
+
+### iceberg.table.commit-branch [string]
+
+Write commits to the specified Iceberg branch. Leave it empty to commit to the table's default branch.
+
+### custom_sql [string]
+
+When `data_save_mode = CUSTOM_PROCESSING`, configure the `delete` SQL that removes the target data before the sink writes. This option is required in that mode.
 
 ### krb5_path [string]
 
@@ -196,6 +233,23 @@ sink {
 }
 ```
 
+### Commit To Iceberg Branch
+
+```hocon
+sink {
+  Iceberg {
+    catalog_name = "seatunnel_test"
+    iceberg.catalog.config = {
+      type = "hadoop"
+      warehouse = "file:///tmp/seatunnel/iceberg/hadoop-sink/"
+    }
+    namespace = "seatunnel_namespace"
+    table = "iceberg_sink_table"
+    iceberg.table.commit-branch = "audit_branch"
+  }
+}
+```
+
 ### Glue Catalog
 
 ```hocon
@@ -240,12 +294,12 @@ sink {
     table = "user_data"
 
     iceberg.catalog.config = {
-      type: "rest"
-      warehouse: "arn:aws:s3tables:<Region>:<accountID>:bucket/<bucketname>"
-      uri: "https://s3tables.<Region>.amazonaws.com/iceberg"
-      rest.sigv4-enabled: "true"
-      rest.signing-name: "s3tables"
-      rest.signing-region: "<Region>"
+      type = "rest"
+      warehouse = "arn:aws:s3tables:<Region>:<accountID>:bucket/<bucketname>"
+      uri = "https://s3tables.<Region>.amazonaws.com/iceberg"
+      rest.sigv4-enabled = "true"
+      rest.signing-name = "s3tables"
+      rest.signing-region = "<Region>"
     }
   }
 }
