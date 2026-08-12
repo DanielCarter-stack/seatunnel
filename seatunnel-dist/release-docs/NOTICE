@@ -1,6 +1,10 @@
 Apache SeaTunnel
 Copyright 2021-2024 The Apache Software Foundation
 
+This product includes Bouncy Castle Provider (LTS Distribution), developed by
+The Legion of the Bouncy Castle Inc. and distributed under the Bouncy Castle
+License. The license text is provided in licenses/LICENSE-bcprov-lts8on.txt.
+
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
 
@@ -714,6 +718,23 @@ and updated within the WildFly project (https://github.com/wildfly/wildfly).
 
 The class org.apache.calcite.linq4j.tree.ConstantExpression contains code
 originating from the Calcite project (https://github.com/apache/calcite).
+
+=========================================================================
+
+Apache Calcite NOTICE
+
+=========================================================================
+
+Apache Calcite
+Copyright 2012-2024 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+This product is based on source code originally developed
+by DynamoBI Corporation, LucidEra Inc., SQLstream Inc. and others
+under the auspices of the Eigenbase Foundation
+and released as the LucidDB project.
 
 =========================================================================
 
