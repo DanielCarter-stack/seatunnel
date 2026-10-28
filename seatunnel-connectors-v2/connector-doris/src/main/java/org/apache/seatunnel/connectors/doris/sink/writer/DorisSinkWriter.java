@@ -25,8 +25,12 @@ import org.apache.seatunnel.api.sink.SupportSchemaEvolutionSinkWriter;
 import org.apache.seatunnel.api.table.catalog.CatalogTable;
 import org.apache.seatunnel.api.table.catalog.TablePath;
 import org.apache.seatunnel.api.table.catalog.TableSchema;
+import org.apache.seatunnel.api.table.schema.event.RestoreTableSchemaEvent;
 import org.apache.seatunnel.api.table.schema.event.SchemaChangeEvent;
 import org.apache.seatunnel.api.table.schema.handler.TableSchemaChangeEventDispatcher;
+import org.apache.seatunnel.api.table.type.ArrayType;
+import org.apache.seatunnel.api.table.type.MapType;
+import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.connectors.doris.config.DorisSinkConfig;
@@ -45,6 +49,7 @@ import org.apache.seatunnel.connectors.doris.util.UnsupportedTypeConverterUtils;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -83,6 +88,10 @@ public class DorisSinkWriter
     private SchemaChangeManager schemaChangeManager;
     private final DorisStreamLoadFactory streamLoadFactory;
     private String controlHostPort;
+    // Set once this writer instance has logged the TIMESTAMP_TZ zone warning, and only then: a
+    // schema without such columns leaves it unset, so a later schema change can still warn. It is
+    // not shared across writers or kept in state, so a restored writer may warn again.
+    private boolean timestampTzZoneWarningLogged;
 
     public DorisSinkWriter(
             SinkWriter.Context context,
@@ -136,6 +145,9 @@ public class DorisSinkWriter
         this.schemaChangeManager = new SchemaChangeManager(dorisSinkConfig);
         this.streamLoadFactory = streamLoadFactory;
         this.initializeLoad();
+        if (!dorisSinkConfig.getEnable2PC()) {
+            context.registerFlushAction(this::timerFlush);
+        }
     }
 
     private void initializeLoad() {
@@ -204,16 +216,55 @@ public class DorisSinkWriter
     }
 
     @Override
-    public void applySchemaChange(SchemaChangeEvent event) {
+    public void applySchemaChange(SchemaChangeEvent event) throws IOException {
+        boolean restoreRuntimeSchema = event instanceof RestoreTableSchemaEvent;
+        if (!restoreRuntimeSchema) {
+            validateSchemaChangeCompatibility();
+        }
+
+        // The in-flight stream load may still buffer rows serialized with the previous schema.
+        // In non-2PC mode each micro-batch is an independent load, so close the current load
+        // first (committing the buffered rows against the still-unaltered table) before applying
+        // the DDL, then reopen a fresh load so subsequent rows are loaded against the new schema.
+        // Mixing schemas within a single load corrupts data (e.g. column mismatch for csv/dropped
+        // columns). 2PC keeps a single transaction per checkpoint, so only name-based JSON loads
+        // are allowed to cross a schema-change boundary.
+        boolean flushBeforeSchemaChange = !dorisSinkConfig.getEnable2PC();
+        if (flushBeforeSchemaChange) {
+            flush();
+        }
+
         this.tableSchema = tableSchemaChanger.reset(tableSchema).apply(event);
         SeaTunnelRowType seaTunnelRowType = tableSchema.toPhysicalRowDataType();
         this.serializer = createSerializer(this.dorisSinkConfig, seaTunnelRowType);
 
-        try {
-            schemaChangeManager.applySchemaChange(sinkTablePath, event);
-        } catch (Exception e) {
+        if (!restoreRuntimeSchema) {
+            try {
+                schemaChangeManager.applySchemaChange(sinkTablePath, event);
+            } catch (Exception e) {
+                throw new DorisSchemaChangeException(
+                        DorisConnectorErrorCode.SCHEMA_CHANGE_FAILED, "Failed to schemaChange", e);
+            }
+        }
+
+        if (flushBeforeSchemaChange) {
+            startLoad(labelGenerator.generateLabel(lastCheckpointId));
+        }
+    }
+
+    private void validateSchemaChangeCompatibility() {
+        if (!dorisSinkConfig.getEnable2PC()) {
+            return;
+        }
+        String format = dorisSinkConfig.getStreamLoadProps().getProperty(LoadConstants.FORMAT_KEY);
+        if (!LoadConstants.JSON.equalsIgnoreCase(format)) {
             throw new DorisSchemaChangeException(
-                    DorisConnectorErrorCode.SCHEMA_CHANGE_FAILED, "Failed to schemaChange");
+                    DorisConnectorErrorCode.SCHEMA_CHANGE_FAILED,
+                    String.format(
+                            "Doris schema evolution with sink.enable-2pc=true only supports "
+                                    + "stream load format=json, but current format is %s. "
+                                    + "Use format=json or set sink.enable-2pc=false.",
+                            format));
         }
     }
 
@@ -225,7 +276,12 @@ public class DorisSinkWriter
         }
         long txnId = respContent.getTxnId();
 
-        return Optional.of(new DorisCommitInfo(controlHostPort, dorisStreamLoad.getDb(), txnId));
+        return Optional.of(
+                new DorisCommitInfo(
+                        controlHostPort,
+                        dorisStreamLoad.getDb(),
+                        txnId,
+                        dorisStreamLoad.getLabel()));
     }
 
     private RespContent flush() throws IOException {
@@ -242,6 +298,16 @@ public class DorisSinkWriter
         return respContent;
     }
 
+    /**
+     * Finishes the current non-2PC Stream Load and opens a new one when the Zeta engine delivers a
+     * timer flush signal.
+     */
+    private void timerFlush() throws IOException {
+        checkLoadException();
+        flush();
+        startLoad(labelGenerator.generateLabel(lastCheckpointId));
+    }
+
     @Override
     public List<DorisSinkState> snapshotState(long checkpointId) {
         checkState(dorisStreamLoad != null);
@@ -252,6 +318,11 @@ public class DorisSinkWriter
 
     private void startLoad(String label) {
         this.dorisStreamLoad.startLoad(label);
+    }
+
+    // visible for testing: allows injecting a mocked SchemaChangeManager to avoid real HTTP calls.
+    void setSchemaChangeManager(SchemaChangeManager schemaChangeManager) {
+        this.schemaChangeManager = schemaChangeManager;
     }
 
     @Override
@@ -306,7 +377,80 @@ public class DorisSinkWriter
 
     private DorisSerializer createSerializer(
             DorisSinkConfig dorisSinkConfig, SeaTunnelRowType seaTunnelRowType) {
+        if (!timestampTzZoneWarningLogged) {
+            Optional<String> warning =
+                    timestampTzZoneWarning(
+                            catalogTable.getTablePath(),
+                            seaTunnelRowType,
+                            dorisSinkConfig.getDatetimeTimezone(),
+                            ZoneId.systemDefault());
+            if (warning.isPresent()) {
+                log.warn(warning.get());
+                timestampTzZoneWarningLogged = true;
+            }
+        }
         return SeaTunnelRowSerializerFactory.createSerializer(dorisSinkConfig, seaTunnelRowType);
+    }
+
+    /**
+     * Doris has no timezone-aware datetime type, so TIMESTAMP_TZ values are written as wall-clock
+     * time in {@code sink.datetime-timezone}, or in the JVM default zone when it is unset. The JVM
+     * zone can differ from the zone expected in Doris without any error, so say which zone is used.
+     */
+    static Optional<String> timestampTzZoneWarning(
+            TablePath tablePath,
+            SeaTunnelRowType rowType,
+            ZoneId configuredZone,
+            ZoneId jvmDefaultZone) {
+        if (configuredZone != null) {
+            return Optional.empty();
+        }
+        List<String> columns = new ArrayList<>();
+        for (int i = 0; i < rowType.getTotalFields(); i++) {
+            collectTimestampTzPaths(rowType.getFieldName(i), rowType.getFieldType(i), columns);
+        }
+        if (columns.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(
+                String.format(
+                        "Doris sink table %s has TIMESTAMP_TZ columns %s and "
+                                + "'sink.datetime-timezone' is not set. These values are written "
+                                + "as wall-clock time in the JVM default zone %s. If Doris expects "
+                                + "another zone, set 'sink.datetime-timezone'.",
+                        tablePath, columns, jvmDefaultZone));
+    }
+
+    /**
+     * Collects the TIMESTAMP_TZ columns of a type, including nested ones, for the warning message
+     * only. Nested paths use {@code .field} for row fields, {@code []} for array elements and
+     * {@code .<key>} / {@code .<value>} for map keys and values; they are not configuration paths.
+     */
+    private static void collectTimestampTzPaths(
+            String path, SeaTunnelDataType<?> type, List<String> paths) {
+        switch (type.getSqlType()) {
+            case TIMESTAMP_TZ:
+                paths.add(path);
+                break;
+            case ROW:
+                SeaTunnelRowType rowType = (SeaTunnelRowType) type;
+                for (int i = 0; i < rowType.getTotalFields(); i++) {
+                    collectTimestampTzPaths(
+                            path + "." + rowType.getFieldName(i), rowType.getFieldType(i), paths);
+                }
+                break;
+            case ARRAY:
+                collectTimestampTzPaths(
+                        path + "[]", ((ArrayType<?, ?>) type).getElementType(), paths);
+                break;
+            case MAP:
+                MapType<?, ?> mapType = (MapType<?, ?>) type;
+                collectTimestampTzPaths(path + ".<key>", mapType.getKeyType(), paths);
+                collectTimestampTzPaths(path + ".<value>", mapType.getValueType(), paths);
+                break;
+            default:
+                break;
+        }
     }
 
     private InitializedStreamLoad initializeStreamLoad(

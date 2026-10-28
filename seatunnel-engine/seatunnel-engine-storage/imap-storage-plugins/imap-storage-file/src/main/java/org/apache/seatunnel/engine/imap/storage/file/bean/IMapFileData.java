@@ -44,8 +44,29 @@ public class IMapFileData implements Serializable, Comparable<IMapFileData> {
 
     private long timestamp;
 
+    /**
+     * Epoch milliseconds at which the entry expires, or {@code null} if it never expires.
+     *
+     * <p>ProtoStuff numbers fields by declaration order, so this field must stay last to keep WAL
+     * files written before it was added readable. Those records read it as {@code null}, and
+     * releases that do not know this field skip it.
+     */
+    private Long expirationTime;
+
     @Override
     public int compareTo(IMapFileData o) {
-        return o.timestamp - this.timestamp > 0 ? 1 : -1;
+        return IMapDataComparator.compare(
+                this.deleted,
+                this.key,
+                this.keyClassName,
+                this.value,
+                this.valueClassName,
+                this.timestamp,
+                o.deleted,
+                o.key,
+                o.keyClassName,
+                o.value,
+                o.valueClassName,
+                o.timestamp);
     }
 }

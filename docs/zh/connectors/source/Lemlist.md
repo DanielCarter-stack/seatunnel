@@ -4,94 +4,178 @@ import ChangeLog from '../changelog/connector-http-lemlist.md';
 
 > Lemlist 源连接器
 
+## 支持这些引擎
+
+> Spark<br/>
+> Flink<br/>
+> SeaTunnel Zeta<br/>
+
 ## 描述
 
-用于从 Lemlist 读取数据。
+用于从 Lemlist API 读取数据。连接器会把 `password` 当作 Lemlist API Key，通过 Basic 认证生成请求头，然后复用 HTTP Source 的能力解析返回结果。
+
+Lemlist 连接器与其他基于 HTTP 的源连接器共用同一套 HTTP 请求和重试能力。把 `password` 配置为 Lemlist API Key，再把 `url` 指向要调用的 Lemlist 接口。
+
+## 支持的数据源信息
+
+使用 Lemlist 连接器需要安装下面的依赖。可以通过 install-plugin.sh 安装，也可以从 Maven 中央仓库下载。
+
+| 数据源     | 支持版本 | 依赖                                                                                            |
+|------------|----------|-------------------------------------------------------------------------------------------------|
+| Lemlist    | 通用     | [下载](https://mvnrepository.com/artifact/org.apache.seatunnel/connector-http-lemlist)              |
 
 ## 关键特性
 
-- [x] [批](../../introduction/concepts/connector-v2-features.md)
-- [ ] [流](../../introduction/concepts/connector-v2-features.md)
+- [x] [批处理](../../introduction/concepts/connector-v2-features.md)
+- [x] [流处理](../../introduction/concepts/connector-v2-features.md)
 - [ ] [精确一次](../../introduction/concepts/connector-v2-features.md)
 - [ ] [列投影](../../introduction/concepts/connector-v2-features.md)
-- [ ] [并行性](../../introduction/concepts/connector-v2-features.md)
-- [ ] [支持用户自定义split](../../introduction/concepts/connector-v2-features.md)
+- [ ] [并行度](../../introduction/concepts/connector-v2-features.md)
+- [ ] [支持用户定义分片](../../introduction/concepts/connector-v2-features.md)
+
+:::tip
+
+在流模式下，连接器会反复请求配置的 API。可以用 `poll_interval_millis` 控制请求间隔。
+
+:::
 
 ## 选项
 
-| 参数名 | 类型 | 必须 | 默认值 | 描述 |
-|--------|------|------|--------|------|
-| url | String | 是 | - | HTTP 请求 URL |
-| password | String | 是 | - | API 密钥用于登录 |
-| method | String | 否 | get | HTTP 请求方法，仅支持 GET、POST 方法 |
-| schema.fields | Config | 否 | - | 上游数据的模式字段 |
-| format | String | 否 | json | 上游数据的格式，现在仅支持 `json` `text`，默认 `json`。 |
-| params | Map | 否 | - | HTTP 参数 |
-| body | String | 否 | - | HTTP 请求体 |
-| json_field | Config | 否 | - | JSON 字段配置 |
-| content_json | String | 否 | - | 内容 JSON 配置 |
-| poll_interval_millis | int | 否 | - | 流模式下请求 HTTP API 的间隔（毫秒） |
-| retry | int | 否 | - | 如果 HTTP 请求返回 `IOException` 的最大重试次数 |
-| retry_backoff_multiplier_ms | int | 否 | 100 | HTTP 请求失败时的重试退避倍数（毫秒） |
-| retry_backoff_max_ms | int | 否 | 10000 | HTTP 请求失败时的最大重试退避时间（毫秒） |
-| enable_multi_lines | boolean | 否 | false | 是否启用多行模式 |
-| common-options | config | 否 | - | 源插件通用参数 |
+| 名称                        | 类型   | 是否必填 | 默认值 | 说明 |
+|-----------------------------|--------|----------|--------|------|
+| url                         | String | 是       | -      | Lemlist API 地址。 |
+| password                    | String | 是       | -      | Lemlist API Key。 |
+| method                      | String | 否       | GET    | HTTP 请求方法，支持 `GET` 和 `POST`。 |
+| headers                     | Map    | 否       | -      | 额外的 HTTP 请求头。此处配置的 `Authorization` 会被连接器自动生成的 Basic 认证头覆盖。 |
+| params                      | Map    | 否       | -      | HTTP 查询参数。 |
+| body                        | String | 否       | -      | HTTP 请求体，通常和 `POST` 一起使用。 |
+| format                      | String | 否       | TEXT   | 返回内容格式。如果要用 `schema`、`json_field` 或 `content_field` 解析 JSON，请设置为 `json`。 |
+| schema                      | Config | 否       | -      | 输出字段结构。`format = "json"` 时必须配置。 |
+| json_field                  | Config | 否       | -      | 用 JSONPath 把返回字段映射到输出列，必须和 `schema` 一起使用。 |
+| content_field               | String | 否       | -      | 用 JSONPath 选出需要按行解析的数组或对象。 |
+| poll_interval_millis        | int    | 否       | -      | 流模式下的请求间隔，单位毫秒。 |
+| retry                       | int    | 否       | -      | 请求出现 `IOException` 时的最大重试次数。 |
+| retry_backoff_multiplier_ms | int    | 否       | 100    | 重试退避时间倍数，单位毫秒。 |
+| retry_backoff_max_ms        | int    | 否       | 10000  | 最大重试退避时间，单位毫秒。 |
+| json_filed_missed_return_null | boolean | 否     | false  | `json_field` 中配置的字段缺失时，是否返回 `null`。 |
+| common-options              | config | 否       | -      | 源连接器通用配置，见 [源通用选项](../common-options/source-common-options.md)。 |
 
-### url [String]
+### 认证
 
-HTTP 请求 URL
+把 `password` 配置为 Lemlist API Key。连接器会用空用户名和该 API Key 生成 Basic 认证请求头。
 
-### password [String]
+### 返回结果解析
 
-API 密钥用于登录，您可以在以下链接获取更多详情：
+`format` 默认值是 `TEXT`，会把完整响应作为一个 `content` 字段输出。
 
-https://developer.lemlist.com/
+如果需要结构化输出，请配置 `format = "json"` 和 `schema`：
 
-### method [String]
+```hocon
+format = "json"
+schema = {
+  fields {
+    _id = string
+    name = string
+    userIds = "array<string>"
+    createdBy = string
+    createdAt = string
+    apiKey = string
+    billing = {
+      quantity = int
+      ok = boolean
+      plan = string
+    }
+  }
+}
+```
 
-HTTP 请求方法，仅支持 GET、POST 方法
+如果行数据在嵌套 JSON 节点里，用 `content_field` 选出对应节点。如果输出列需要从不同 JSONPath 中提取，用 `json_field`。
 
-### params [Map]
+### 请求范围与轮询限制
 
-HTTP 参数
+每次配置的请求只读取一份 HTTP 响应。当前连接器不支持自动分页：`pageing` 不会推进页码，也不会跟随下一页链接或游标。需要多页数据时，请在 API 请求中指定某一页，或在连接器外编排多次请求。
 
-### body [String]
+流模式会重复发送配置的请求，可能再次输出相同的行。连接器不会把 API 游标保存到 checkpoint 来实现增量恢复，因此重复轮询和重启都可能产生重复数据。
 
-HTTP 请求体
+## 示例
 
-### poll_interval_millis [int]
+### 批量读取 Lemlist 团队信息
 
-流模式下请求 HTTP API 的间隔（毫秒）
+```hocon
+env {
+  parallelism = 1
+  job.mode = "BATCH"
+}
 
-### retry [int]
+source {
+  Lemlist {
+    plugin_output = "lemlist"
+    url = "https://api.lemlist.com/api/team"
+    password = "replace-with-api-key"
+    method = "GET"
+    format = "json"
+    schema = {
+      fields {
+        _id = string
+        name = string
+        userIds = "array<string>"
+        createdBy = string
+        createdAt = string
+        apiKey = string
+        billing = {
+          quantity = int
+          ok = boolean
+          plan = string
+        }
+      }
+    }
+  }
+}
 
-如果 HTTP 请求返回 `IOException` 的最大重试次数
+sink {
+  Console {
+    plugin_input = "lemlist"
+  }
+}
+```
 
-### retry_backoff_multiplier_ms [int]
+### 流模式下轮询读取
 
-HTTP 请求失败时的重试退避倍数（毫秒）
+对于数据随时间增长的 Lemlist 接口，使用 `STREAMING` 模式运行连接器，
+通过 `poll_interval_millis` 控制 SeaTunnel 重新发起请求的频率。
 
-### retry_backoff_max_ms [int]
+```hocon
+env {
+  parallelism = 1
+  job.mode = "STREAMING"
+  checkpoint.interval = 60000
+}
 
-HTTP 请求失败时的最大重试退避时间（毫秒）
+source {
+  Lemlist {
+    plugin_output = "lemlist_stream"
+    url = "https://api.lemlist.com/api/activities"
+    password = "replace-with-api-key"
+    method = "GET"
+    poll_interval_millis = 30000
+    format = "json"
+    schema = {
+      fields {
+        _id = string
+        type = string
+        createdAt = string
+      }
+    }
+  }
+}
 
-### format [String]
-
-上游数据的格式，现在仅支持 `json` `text`，默认 `json`。
-
-当您指定格式为 `json` 时，您还应该指定 schema 选项。
-
-### schema [Config]
-
-#### fields [Config]
-
-上游数据的模式字段。更多详情请参考 [Schema 特性](../../introduction/concepts/schema-feature.md)。
-
-### content_json [String]
-
-此参数可以获取一些 JSON 数据。如果您只需要 'book' 部分中的数据，配置 `content_field = "$.store.book.*"`。
+sink {
+  Console {
+    plugin_input = "lemlist_stream"
+  }
+}
+```
 
 ## 变更日志
 
 <ChangeLog />
-

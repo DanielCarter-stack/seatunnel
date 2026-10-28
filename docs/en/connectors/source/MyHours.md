@@ -10,61 +10,64 @@ import ChangeLog from '../changelog/connector-http-myhours.md';
 > Flink<br/>
 > SeaTunnel Zeta<br/>
 
-## Key Features
-
-- [x] [batch](../../introduction/concepts/connector-v2-features.md)
-- [ ] [stream](../../introduction/concepts/connector-v2-features.md)
-- [ ] [exactly-once](../../introduction/concepts/connector-v2-features.md)
-- [ ] [column projection](../../introduction/concepts/connector-v2-features.md)
-- [ ] [parallelism](../../introduction/concepts/connector-v2-features.md)
-- [ ] [support user-defined split](../../introduction/concepts/connector-v2-features.md)
-
 ## Description
 
-Used to read data from My Hours.
+The My Hours source exposes settings for reading My Hours REST endpoints through the shared HTTP request and retry runtime.
+
+:::caution Authentication limitation
+
+Automatic email/password authentication currently sends the configured data request instead of the login request containing credentials. The template below using a data URL is a configuration reference and does not complete that login. A separately tested connector authentication fix is required before live use; access tokens are not automatically refreshed.
+
+:::
 
 ## Key features
 
 - [x] [batch](../../introduction/concepts/connector-v2-features.md)
-- [ ] [stream](../../introduction/concepts/connector-v2-features.md)
+- [x] [stream](../../introduction/concepts/connector-v2-features.md)
 - [ ] [exactly-once](../../introduction/concepts/connector-v2-features.md)
 - [ ] [column projection](../../introduction/concepts/connector-v2-features.md)
 - [ ] [parallelism](../../introduction/concepts/connector-v2-features.md)
 - [ ] [support user-defined split](../../introduction/concepts/connector-v2-features.md)
 
+:::tip
+
+The shared HTTP reader supports repeated polling in streaming mode using `poll_interval_millis`. The authentication limitation above applies to My Hours in both batch and streaming modes.
+
+:::
+
 ## Supported DataSource Info
 
-In order to use the My Hours connector, the following dependencies are required.
-They can be downloaded via install-plugin.sh or from the Maven central repository.
+In order to use the My Hours connector, the following dependency is required.
+It can be downloaded via install-plugin.sh or from the Maven central repository.
 
 | Datasource | Supported Versions |                                         Dependency                                          |
 |------------|--------------------|---------------------------------------------------------------------------------------------|
-| My Hours   | universal          | [Download](https://mvnrepository.com/artifact/org.apache.seatunnel) |
+| My Hours   | universal          | [Download](https://mvnrepository.com/artifact/org.apache.seatunnel/connector-http-myhours)      |
 
 ## Source Options
 
-|            Name             |  Type   | Required | Default |                                                             Description                                                              |
-|-----------------------------|---------|----------|---------|--------------------------------------------------------------------------------------------------------------------------------------|
-| url                         | String  | Yes      | -       | Http request url.                                                                                                                    |
-| email                       | String  | Yes      | -       | My hours login email address.                                                                                                        |
-| password                    | String  | Yes      | -       | My hours login password.                                                                                                             |
-| schema                      | Config  | No       | -       | Http and seatunnel data structure mapping. For more details, please refer to [Schema Feature](../../introduction/concepts/schema-feature.md).                                                                                            |
-| schema.fields               | Config  | No       | -       | The schema fields of upstream data                                                                                                   |
-| json_field                  | Config  | No       | -       | This parameter helps you configure the schema,so this parameter must be used with schema.                                            |
-| content_json                | String  | No       | -       | This parameter can get some json data.If you only need the data in the 'book' section, configure `content_field = "$.store.book.*"`. |
-| format                      | String  | No       | json    | The format of upstream data, now only support `json` `text`, default `json`.                                                         |
-| method                      | String  | No       | get     | Http request method, only supports GET, POST method.                                                                                 |
-| headers                     | Map     | No       | -       | Http headers.                                                                                                                        |
-| params                      | Map     | No       | -       | Http params.                                                                                                                         |
-| body                        | String  | No       | -       | Http body.                                                                                                                           |
-| poll_interval_millis        | Int     | No       | -       | Request http api interval(millis) in stream mode.                                                                                    |
-| retry                       | Int     | No       | -       | The max retry times if request http return to `IOException`.                                                                         |
-| retry_backoff_multiplier_ms | Int     | No       | 100     | The retry-backoff times(millis) multiplier if request http failed.                                                                   |
-| retry_backoff_max_ms        | Int     | No       | 10000   | The maximum retry-backoff times(millis) if request http failed                                                                       |
-| enable_multi_lines          | Boolean | No       | false   |                                                                                                                                      |
-| common-options              |         | No       | -       | Source plugin common parameters, please refer to [Source Common Options](../common-options/source-common-options.md) for details                    |
+|            Name             |  Type   | Required | Default | Description                                                                                                           |
+|-----------------------------|---------|----------|---------|-----------------------------------------------------------------------------------------------------------------------|
+| url                         | String  | Yes      | -       | My Hours API request URL.                                                                                             |
+| email                       | String  | Yes      | -       | My Hours login email address.                                                                                         |
+| password                    | String  | Yes      | -       | My Hours login password.                                                                                              |
+| schema                      | Config  | No       | -       | Required when `format` is `json`. For more details, see [Schema Feature](../../introduction/concepts/schema-feature.md). |
+| schema.fields               | Config  | No       | -       | The schema fields of upstream data.                                                                                   |
+| json_field                  | Config  | No       | -       | Extract fields from a JSON response by JSONPath. Use it together with `schema`.                                       |
+| content_field               | String  | No       | -       | Extract one part of a JSON response, such as `$.store.book.*`, before schema parsing.                                 |
+| format                      | String  | No       | text    | Response format. Supports `json` and `text`. Set `json` when using `schema`, `json_field`, or `content_field`.        |
+| method                      | String  | No       | GET     | HTTP request method. Supports `GET` and `POST`.                                                                       |
+| headers                     | Map     | No       | -       | Extra HTTP headers. The connector adds the My Hours `Authorization` header after login.                               |
+| params                      | Map     | No       | -       | HTTP query parameters.                                                                                                |
+| body                        | String  | No       | -       | HTTP request body.                                                                                                    |
+| poll_interval_millis        | Int     | No       | -       | Request interval in milliseconds for stream mode.                                                                      |
+| retry                       | Int     | No       | -       | Maximum retry times when the request throws `IOException`.                                                            |
+| retry_backoff_multiplier_ms | Int     | No       | 100     | Retry backoff multiplier in milliseconds.                                                                             |
+| retry_backoff_max_ms        | Int     | No       | 10000   | Maximum retry backoff in milliseconds.                                                                                |
+| json_filed_missed_return_null | Boolean | No     | false   | Return `null` when a configured JSON field is missing.                                                                |
+| common-options              |         | No       | -       | Source plugin common parameters. See [Source Common Options](../common-options/source-common-options.md).             |
 
-## How to Create a My Hours Data Synchronization Jobs
+## Configuration reference (authentication currently blocked)
 
 ```hocon
 env {
@@ -72,10 +75,13 @@ env {
   job.mode = "BATCH"
 }
 
-MyHours{
+source {
+  MyHours {
     url = "https://api2.myhours.com/api/Projects/getAll"
     email = "seatunnel@test.com"
-    password = "seatunnel"
+    password = "********"
+    method = "GET"
+    format = "json"
     schema {
        fields {
          name = string
@@ -103,6 +109,7 @@ MyHours{
          id = string
        }
     }
+  }
 }
 
 # Console printing of the read data
@@ -114,6 +121,16 @@ sink {
 ```
 
 ## Parameter Interpretation
+
+### Authentication
+
+The configuration requires `email` and `password`, but the current implementation has the authentication limitation described above. No automatic access-token refresh is implemented.
+
+### Request scope and polling limits
+
+Each configured request reads one HTTP response. Automatic pagination is not supported: `pageing` does not advance pages or follow next-page links or cursors. Select a specific page in the API request or manage multiple requests outside the connector.
+
+Streaming mode repeats the configured request. Polls can re-emit the same rows, and the connector does not checkpoint an API cursor for incremental recovery. Repeated polls and restarts can therefore produce duplicates.
 
 ### format
 
@@ -167,7 +184,7 @@ connector will generate data as the following:
 |----------------------------------------------------------|
 | {"code":  200, "data":  "get success", "success":  true} |
 
-### content_json
+### content_field
 
 This parameter can get some json data.If you only need the data in the 'book' section, configure `content_field = "$.store.book.*"`.
 
@@ -221,8 +238,10 @@ You can configure `content_field = "$.store.book.*"` and the result returned loo
 Then you can get the desired result with a simpler schema,like
 
 ```hocon
-Http {
+MyHours {
   url = "http://mockserver:1080/contentjson/mock"
+  email = "seatunnel@test.com"
+  password = "********"
   method = "GET"
   format = "json"
   content_field = "$.store.book.*"
@@ -236,11 +255,6 @@ Http {
   }
 }
 ```
-
-Here is an example:
-
-- Test data can be found at this link [mockserver-config.json](../../../../seatunnel-e2e/seatunnel-connector-v2-e2e/connector-http-e2e/src/test/resources/mockserver-config.json)
-- See this link for task configuration [http_contentjson_to_assert.conf](../../../../seatunnel-e2e/seatunnel-connector-v2-e2e/connector-http-e2e/src/test/resources/http_contentjson_to_assert.conf).
 
 ### json_field
 
@@ -278,8 +292,10 @@ You can get the contents of 'book' by configuring the task as follows:
 
 ```hocon
 source {
-  Http {
+  MyHours {
     url = "http://mockserver:1080/jsonpath/mock"
+    email = "seatunnel@test.com"
+    password = "********"
     method = "GET"
     format = "json"
     json_field = {
@@ -299,9 +315,6 @@ source {
   }
 }
 ```
-
-- Test data can be found at this link [mockserver-config.json](../../../../seatunnel-e2e/seatunnel-connector-v2-e2e/connector-http-e2e/src/test/resources/mockserver-config.json)
-- See this link for task configuration [http_jsonpath_to_assert.conf](../../../../seatunnel-e2e/seatunnel-connector-v2-e2e/connector-http-e2e/src/test/resources/http_jsonpath_to_assert.conf).
 
 ## Changelog
 

@@ -36,6 +36,12 @@ connector-console
 sh bin/install-plugin.sh
 ```
 
+在 Windows 上，请改用批处理脚本：
+
+```bat
+bin\install-plugin.cmd
+```
+
 ### 步骤 1: 部署SeaTunnel及连接器
 
 在开始前，请确保您已经按照[部署](deployment.md)中的描述下载并部署了SeaTunnel。
@@ -103,12 +109,19 @@ cd "apache-seatunnel-${version}"
 
 ```
 
+在 Windows 上，请在 SeaTunnel 目录下运行对应的批处理入口：
+
+```bat
+cd apache-seatunnel-3.0.0
+bin\seatunnel.cmd --config config\v2.batch.config.template -m local
+```
+
 **查看输出**: 当您运行该命令时，您可以在控制台中看到它的输出。您可以认为这是命令运行成功或失败的标志。
 
 SeaTunnel控制台将会打印一些如下日志信息:
 
 ```shell
-2022-12-19 11:01:45,417 INFO  org.apache.seatunnel.connectors.seatunnel.console.sink.ConsoleSinkWriter - output rowType: name<STRING>, age<INT>
+2022-12-19 11:01:45,417 INFO  org.apache.seatunnel.connectors.seatunnel.console.sink.ConsoleSinkWriter - output rowType: new_name<STRING>, age<INT>
 2022-12-19 11:01:46,489 INFO  org.apache.seatunnel.connectors.seatunnel.console.sink.ConsoleSinkWriter - subtaskIndex=0 rowIndex=1:  SeaTunnelRow#tableId=-1 SeaTunnelRow#kind=INSERT: CpiOd, 8520946
 2022-12-19 11:01:46,490 INFO  org.apache.seatunnel.connectors.seatunnel.console.sink.ConsoleSinkWriter - subtaskIndex=0 rowIndex=2: SeaTunnelRow#tableId=-1 SeaTunnelRow#kind=INSERT: eQqTs, 1256802974
 2022-12-19 11:01:46,490 INFO  org.apache.seatunnel.connectors.seatunnel.console.sink.ConsoleSinkWriter - subtaskIndex=0 rowIndex=3: SeaTunnelRow#tableId=-1 SeaTunnelRow#kind=INSERT: UsRgO, 2053193072
@@ -220,7 +233,7 @@ Total Failed Count        :                   0
 
 :::tip
 
-如果您想优化自己的作业，请参照连接器使用文档
+如果您想优化自己的作业，请参照 [Source-MySQL](../../connectors/source/Mysql.md) 和 [Sink-Doris](../../connectors/sink/Doris.md) 的连接器使用文档。
 
 :::
 
@@ -243,6 +256,7 @@ Total Failed Count        :                   0
 
 - 如果你想先建立整体路径感，可以返回阅读[快速入门总览](../overview.md)。
 - 当你准备把示例 Source 和 Sink 替换成真实连接器时，建议继续阅读[作业配置指南](../job-configuration-guide.md)。
+- 如果你下一步想看一条刚完成端到端核对的新教程，可以先继续看 [MySQL CDC 到 Kafka](../recipes/mysql-cdc-to-kafka.md)。如果你想按别的链路形态继续读，再看 [MySQL CDC 到 Doris](../recipes/mysql-cdc-to-doris.md)、[JDBC 到 S3](../recipes/jdbc-to-s3.md)、[Kafka 到 Iceberg](../recipes/kafka-to-iceberg.md)、[Http 到 JDBC](../recipes/http-to-jdbc.md)、[File 到 StarRocks](../recipes/file-to-starrocks.md) 和 [多表 CDC](../recipes/multi-table-cdc.md)。
 - 开始编写您自己的配置文件，选择您想要使用的[连接器](../../connectors/source)，并根据连接器的文档配置参数。
 - 如果您要部署多节点 SeaTunnel Engine 集群，请继续阅读[SeaTunnel Engine(Zeta) 安装部署](../../engines/zeta/deployment.md)。
 - 如果您想进一步了解 SeaTunnel Engine，请参阅[SeaTunnel引擎](../../engines/zeta/about.md)。
